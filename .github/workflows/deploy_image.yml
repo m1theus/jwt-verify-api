@@ -1,0 +1,58 @@
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+name: Build and Push Image to ECR
+
+jobs:
+  build-app:
+    runs-on: ubuntu-latest
+    name: Build APP
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v1
+        with:
+          java-version: 17
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build
+        run: ./gradlew clean build -x test
+
+      - name: Tests
+        run: ./gradlew test
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ECR_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ECR_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Extract branch name and timestamp
+        shell: bash
+        run: |
+          echo "::set-output name=branch::$(echo ${GITHUB_REF#refs/heads/})"
+          echo "::set-output name=timestamp::$(date +%s)"
+          echo "::set-output name=sha_short::${GITHUB_SHA::8}"
+        id: extract_branch
+
+      - name: Build, tag, and push application image to Amazon ECR
+        id: build-application-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: jwt-verify-api
+          IMAGE_TAG: ${{ steps.extract_branch.outputs.branch }}-${{ steps.extract_branch.outputs.sha_short }}-${{ steps.extract_branch.outputs.timestamp }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
