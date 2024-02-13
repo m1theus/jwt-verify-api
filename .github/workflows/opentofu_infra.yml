@@ -4,9 +4,9 @@ on:
 
 name: Infrastructure tofu plan
 
-defaults:
-  run:
-    working-directory: ${{ env.tf_actions_working_dir }}
+# defaults:
+#   run:
+#     working-directory: ${{ env.tf_actions_working_dir }}
 permissions:
   pull-requests: write
 
