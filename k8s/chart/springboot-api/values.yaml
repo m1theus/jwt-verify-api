@@ -25,37 +25,27 @@ podSecurityContext:
 
 securityContext:
   {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
 
 service:
   type: ClusterIP
-  port: 80
+  port: 8080
+  targetPort: 8080
 
 ingress:
   enabled: true
   className: nginx
   annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
     spec.ingressClassName: nginx
     kubernetes.io/tls-acme: 'true'
   hosts:
-    - host: jwt.mmartins.dev
+    - host: api.mmartins.dev
       paths:
         - path: /
           pathType: Prefix
           backend:
             serviceName: jwt-verify-api-springboot-api
-            servicePort: 80
-  tls:
-    - hosts:
-      - jwt.mmartins.dev
-    - secretName: springboot-api-tls
-          hosts:
-            - jwt.mmartins.dev
+            servicePort: 8080
 
 resources:
   {}
