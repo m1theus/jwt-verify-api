@@ -1,9 +1,9 @@
 terraform {
 
   backend "s3" {
-    bucket         = "jwt-verify-api-backend"
-    key            = "terraform.tfstate"
-    region         = "us-east-2"
+    bucket = "jwt-verify-api-backend"
+    key    = "terraform.tfstate"
+    region = "us-east-2"
   }
 
   required_providers {
