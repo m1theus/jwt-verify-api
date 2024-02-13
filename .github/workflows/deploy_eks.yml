@@ -4,6 +4,9 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+
 name: Build and Push Image to ECR
 
 jobs:
@@ -56,3 +59,28 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}  --kubeconfig ./kubeconfig
+          echo 'KUBE_CONFIG_DATA<<EOF' >> $GITHUB_ENV
+          echo $(cat ./kubeconfig | base64) >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: helm deploy
+        uses: koslib/helm-eks-action@master
+        env:
+          KUBE_CONFIG_DATA: ${{ env.KUBE_CONFIG_DATA }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: jwt-verify-api
+          IMAGE_TAG: ${{ steps.extract_branch.outputs.branch }}-${{ steps.extract_branch.outputs.sha_short }}-${{ steps.extract_branch.outputs.timestamp }}
+        with:
+          command: |
+            helm version
+            kubectl version
+            kubectl cluster-info 
+            helm upgrade jwt-verify-api --install --wait --set image.tag=$IMAGE_TAG --set image.repository="$ECR_REGISTRY/$ECR_REPOSITORY" --set service.port="8080" ./k8s/chart/springboot-api -n default
+
+            helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+            helm repo update
+            helm upgrade springboot-api-ingress --install --wait ingress-nginx/ingress-nginx -f ./k8s/chart/nginx-controller/values.yaml --set controller.service.annotations.external-dns.alpha.kubernetes.io/hostname=jwt.mmartins.dev
